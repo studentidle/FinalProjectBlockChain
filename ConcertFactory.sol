@@ -18,13 +18,13 @@ contract ConcertFactory {
         admin = msg.sender;
     }
 
-    function createConcert(string _name, uint _price, uint _ticket) public {
-        require(msg.sender == sender, "Only admin can create a concert.");
+    function createConcert(string memory _name, uint _price, uint _ticket) public {
+        require(msg.sender == admin, "Only admin can create a concert.");
 
         ConcertContract newConcert = new ConcertContract(_name, _price, _ticket);
         deployedConcerts.push(newConcert);
 
-        emit DeployedConcerts(newConcert, _name, _price, _ticket);
+        emit DeployedConcerts(address(newConcert), _name, _price, _ticket);
     }
 
     function getDeployedConcerts() public view returns (ConcertContract[] memory) {
@@ -32,6 +32,8 @@ contract ConcertFactory {
     }
  }
 
+
+// Child Contract
 contract ConcertContract {
     // This contract is a placeholder for the ConcertContract
     // It can be extended with functions to manage concert details, ticket sales, and attendance
@@ -41,7 +43,11 @@ contract ConcertContract {
     uint public ticketPrice;
     uint public totalTicket;
 
-    constructor(string _name, uint _price, uint _ticket) {
-        concertN
+    constructor(string memory _name, uint _price, uint _ticket) {
+        concertName = _name;
+        ticketPrice = _price;
+        totalTicket = _ticket;
     }
+
+
 }
