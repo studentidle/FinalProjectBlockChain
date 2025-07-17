@@ -44,6 +44,7 @@ contract ConcertContract {
     uint public ticketPrice;
     uint public totalTicket;
     address internal organizer;
+    uint private ticketId = 0;
 
     struct Buyer {
         string name;
@@ -60,7 +61,7 @@ contract ConcertContract {
         ticketPrice = _price;
         totalTicket = _ticket;
         organizer = _organizer;
-        ticketId = 0;
+        
     }
 
     /// @notice buyTicket allows customers to purchase tickets for the concert
@@ -72,9 +73,6 @@ contract ConcertContract {
         require(ticketOwner[ticketId] == address(0), "Ticket already owned.");
         //require(ticketsOwned[msg.sender] < 1, "You can only purchase one ticket at a time.");
 
-        //ADDED: Assign ticket to buyer
-        ticketOwner[ticketId] = msg.sender;
-
         //ADDED: Create customer record
         Buyer storage buyer = buyers[msg.sender];
 
@@ -84,9 +82,13 @@ contract ConcertContract {
             buyer.name = _name;
         }
 
+        //ADDED: Increment ticketId
+        ticketId++;
+
         //ADDED: Update buyer's ticket purchase details
         buyer.ticketsPurchased++;
-        buyer.ticketIds.push(ticketId++);
+        buyer.ticketIds.push(ticketId);
+        ticketOwner[ticketId] = msg.sender;
 
         //ADDED: Decrease total tickets available
         totalTicket--;
