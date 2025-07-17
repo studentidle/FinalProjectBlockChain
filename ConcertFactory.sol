@@ -9,7 +9,7 @@ contract ConcertFactory {
 
     address internal admin;
     ConcertContract[] public deployedConcerts;
-    event DeployedConcerts(address indexed concertAddress, string _name, uint _price, uint _ticket);
+    event DeployedConcerts(address indexed concertAddress, string _name, uint _price, uint _ticket , address _organizer);
 
     constructor() {
         admin = msg.sender;
@@ -19,12 +19,12 @@ contract ConcertFactory {
     /// @param _name The name of the concert
     /// @param _price The price of the ticket for the concert   
     /// @param _ticket The total number of tickets available for the concert
-    function createConcert(string memory _name, uint _price, uint _ticket) public {
+    function createConcert(string memory _name, uint _price, uint _ticket, address _organizer ) public {
         require(msg.sender == admin, "Only admin can create a concert.");
 
-        ConcertContract newConcert = new ConcertContract(_name, _price, _ticket);
+        ConcertContract newConcert = new ConcertContract(_name, _price, _ticket, _organizer);
         deployedConcerts.push(newConcert);
-        emit DeployedConcerts(address(newConcert), _name, _price, _ticket);
+        emit DeployedConcerts(address(newConcert), _name, _price, _ticket, _organizer);
     }
 
     /// @notice getDeployedConcerts returns the list of deployed concert contracts
@@ -44,11 +44,19 @@ contract ConcertContract {
     uint public ticketPrice;
     uint public totalTicket;
 
-    constructor(string memory _name, uint _price, uint _ticket) {
+    address internal organizer;
+    address public customer;
+
+    constructor(string memory _name, uint _price, uint _ticket, address _organizer) {
         concertName = _name;
         ticketPrice = _price;
         totalTicket = _ticket;
+        organizer = _organizer;
     }
+
+    
+
+
 
 
 }
