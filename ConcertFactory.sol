@@ -44,7 +44,7 @@ contract ConcertContract {
     uint public ticketPrice;
     uint public totalTicket;
     address internal organizer;
-    uint private ticketId = 0;
+    uint private ticketId = 1;
 
     struct Buyer {
         string name;
@@ -70,7 +70,7 @@ contract ConcertContract {
         require(msg.value == ticketPrice, "Incorrect ticket price.");
         require(totalTicket > 0, "No tickets available.");
         require(msg.sender != organizer, "Organizer cannot buy tickets.");
-        require(ticketOwner[ticketId++] == address(0), "Ticket already owned.");
+        require(ticketOwner[ticketId] == address(0), "Ticket already owned.");
         //require(ticketsOwned[msg.sender] < 1, "You can only purchase one ticket at a time.");
 
         //ADDED: Create customer record
@@ -82,9 +82,6 @@ contract ConcertContract {
             buyer.name = _name;
         }
 
-        //ADDED: Increment ticketId
-        ticketId++;
-
         //ADDED: Update buyer's ticket purchase details
         buyer.ticketsPurchased++;
         buyer.ticketIds.push(ticketId);
@@ -92,28 +89,14 @@ contract ConcertContract {
 
         //ADDED: Decrease total tickets available
         totalTicket--;
+
+        //ADDED: Increment ticketId
+        ticketId++;
     }
 
     function getMyTickets() public view returns (uint[] memory) {
         return buyers[msg.sender].ticketIds; // Return the list of ticket IDs owned by the buyer
     }
-
-    function returnCurrentTicketId() public view returns (uint) {
-        return ticketId; // Return the current ticket ID
-    }
-
-
-
-
-
-
-    
-
-
-
-
-
-
 
 
 }
