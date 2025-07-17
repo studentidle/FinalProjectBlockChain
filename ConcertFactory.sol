@@ -43,18 +43,58 @@ contract ConcertContract {
     string public concertName;
     uint public ticketPrice;
     uint public totalTicket;
-
     address internal organizer;
-    address public customer;
+
+    struct Buyer {
+        string name;
+        address buyerAddress;
+        uint ticketsPurchased;
+        uint[] ticketIds;
+    }
+
+    mapping(address => Buyer) public buyers; // Buyer address → Buyer details
+    mapping(uint => address) public ticketOwner; // Ticket ID → Owner
 
     constructor(string memory _name, uint _price, uint _ticket, address _organizer) {
         concertName = _name;
         ticketPrice = _price;
         totalTicket = _ticket;
         organizer = _organizer;
+        ticketId = 0;
     }
 
-    
+    /// @notice buyTicket allows customers to purchase tickets for the concert
+    // They can only buy tickets one at a time. Idk if ilan pwede mahoard na tix ng isang buyer 
+    function buyTicket(string memory _name) public payable {
+        require(msg.value == ticketPrice, "Incorrect ticket price.");
+        require(totalTicket > 0, "No tickets available.");
+        require(msg.sender != organizer, "Organizer cannot buy tickets.");
+        require(ticketOwner[ticketId] == address(0), "Ticket already owned.");
+        //require(ticketsOwned[msg.sender] < 1, "You can only purchase one ticket at a time.");
+
+        //ADDED: Assign ticket to buyer
+        ticketOwner[ticketId] = msg.sender;
+
+        //ADDED: Create customer record
+        Buyer storage buyer = buyers[msg.sender];
+
+        if (buyer.buyerAddress == address(0)) {
+            // If first time buyer, set info
+            buyer.buyerAddress = msg.sender;
+            buyer.name = _name;
+        }
+
+        //ADDED: Update buyer's ticket purchase details
+        buyer.ticketsPurchased++;
+        buyer.ticketIds.push(ticketId++);
+
+        //ADDED: Decrease total tickets available
+        totalTicket--;
+    }
+
+
+
+
 
 
 
