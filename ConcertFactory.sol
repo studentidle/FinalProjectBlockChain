@@ -9,7 +9,7 @@ contract ConcertFactory {
 
     address internal admin;
     ConcertContract[] public deployedConcerts;
-    event DeployedConcerts(address indexed concertAddress, string _name, uint _price, uint _ticket , address _organizer);
+    event DeployedConcerts(address indexed concertAddress, string _name, uint[] _prices, uint[] _capacities, uint _maxTicket, address _organizer, string _date);
 
     constructor() {
         admin = msg.sender;
@@ -17,14 +17,19 @@ contract ConcertFactory {
 
     /// @notice createConcert creates a new concert contract
     /// @param _name The name of the concert
-    /// @param _price The price of the ticket for the concert   
-    /// @param _ticket The total number of tickets available for the concert
-    function createConcert(string memory _name, uint _price, uint _ticket, address _organizer ) public {
+    /// @param _prices The price of the ticket for the concert
+    /// @param _capacities The seating capacities for each ticket tier
+    /// @param _maxTicket The total number of tickets available for the concert
+    /// @param _organizer The address of the concert organizer
+    /// @param _date The date of the concert and expiration of the ticket
+    function createConcert(string memory _name, uint[] memory _prices, uint[] memory _capacities, uint _maxTicket, address _organizer, string memory _date) public {
         require(msg.sender == admin, "Only admin can create a concert.");
+        require(_prices.length == _capacities.length, "Please provide complete pricing details.");
 
-        ConcertContract newConcert = new ConcertContract(_name, _price, _ticket, _organizer);
+        ConcertContract newConcert = new ConcertContract(_name, _prices, _capacities, _maxTicket, _organizer, _date);
         deployedConcerts.push(newConcert);
-        emit DeployedConcerts(address(newConcert), _name, _price, _ticket, _organizer);
+
+        emit DeployedConcerts(address(newConcert), _name, _prices, _capacities, _maxTicket, _organizer, _date);
     }
 
     /// @notice getDeployedConcerts returns the list of deployed concert contracts
@@ -43,20 +48,28 @@ contract ConcertContract {
     string public concertName;
     uint public ticketPrice;
     uint public totalTicket;
+    string public expirationDate;
+
     address internal organizer;
     uint private ticketId = 1;
-    bool public concertCancelled;
+    bool private concertCancelled;
+
+    enum TicketTier { GenAd, UpperBoxC, UpperBoxB, UpperBoxA, VIP }
 
     struct Buyer {
         string name;
         address buyerAddress;
         uint ticketsPurchased;
         uint[] ticketIds;
+        //TicketTier ticketTier;
     }
 
     mapping(address => Buyer) public buyers; // Buyer address → Buyer details
     mapping(uint => address) public ticketOwner; // Ticket ID → Owner
     mapping(uint => bool) public ticketUsed; // Ticket ID → Used status
+    mapping(TicketTier => uint) public ticketPrices; // Ticket Tier → Ticket Price
+    mapping(TicketTier => uint) public tierCapacity; // Ticket Tier → Tier Capacity
+    
 
     /// @notice Modifier that checks if the organizer called the function
     modifier isOrganizer() {
@@ -71,12 +84,26 @@ contract ConcertContract {
 
     event TicketUsed(address indexed buyer, uint indexed ticketId);
 
-    constructor(string memory _name, uint _price, uint _ticket, address _organizer) {
+    constructor(
+        string memory _name,
+        uint[] memory _prices,
+        uint[] memory _capacities,
+        uint _maxTicket,
+        address _organizer,
+        string memory _date
+    ) {
         concertName = _name;
-        ticketPrice = _price;
-        totalTicket = _ticket;
+        totalTicket = _maxTicket;
         organizer = _organizer;
-        
+        expirationDate = _date;
+
+        for (uint i = 0; i < _prices.length; i++) {
+            require(_prices[i] > 0, "Prices must be greater than zero.");
+            require(_capacities[i] > 0, "Capacities must be greater than zero.");
+            
+            ticketPrices[TicketTier(i)] = _prices[i];
+            tierCapacity[TicketTier(i)] = _capacities[i];
+        }
     }
 
     /// @notice buyTicket allows customers to purchase tickets for the concert
@@ -149,6 +176,4 @@ contract ConcertContract {
     function getMyTickets() public view returns (uint[] memory) {
         return buyers[msg.sender].ticketIds; // Return the list of ticket IDs owned by the buyer
     }
-
-
 }
