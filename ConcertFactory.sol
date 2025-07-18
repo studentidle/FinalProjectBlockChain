@@ -45,6 +45,7 @@ contract ConcertContract {
     uint public totalTicket;
     address internal organizer;
     uint private ticketId = 1;
+    bool public concertCancelled;
 
     struct Buyer {
         string name;
@@ -114,6 +115,11 @@ contract ConcertContract {
 
         // ADDED: Record in the transaction logs
         emit TicketUsed(ticketOwner[_ticketId], _ticketId);
+    }
+
+    function cancelConcert() external isOrganizer {
+        require(concertCancelled == false, "Concert has already been cancelled");
+        concertCancelled = true;
     }
 
     function getMyTickets() public view returns (uint[] memory) {
