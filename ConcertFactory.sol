@@ -64,6 +64,11 @@ contract ConcertContract {
         _;
     }
 
+    modifier isBuyer() {
+        require(msg.sender != organizer, "Organizer cannot perform this action.");
+        _;
+    }
+
     event TicketUsed(address indexed buyer, uint indexed ticketId);
 
     constructor(string memory _name, uint _price, uint _ticket, address _organizer) {
@@ -76,10 +81,9 @@ contract ConcertContract {
 
     /// @notice buyTicket allows customers to purchase tickets for the concert
     // They can only buy tickets one at a time. Idk if ilan pwede mahoard na tix ng isang buyer 
-    function buyTicket(string memory _name) public payable {
+    function buyTicket(string memory _name) public payable isBuyer() {
         require(msg.value == ticketPrice, "Incorrect ticket price.");
         require(totalTicket > 0, "No tickets available.");
-        require(msg.sender != organizer, "Organizer cannot buy tickets.");
         require(ticketOwner[ticketId] == address(0), "Ticket already owned.");
         //require(ticketsOwned[msg.sender] < 1, "You can only purchase one ticket at a time.");
 
