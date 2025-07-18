@@ -108,6 +108,26 @@ contract ConcertContract {
         ticketId++;
     }
 
+    /// @notice transferTicket Allows a ticket owner to gift or resell their ticket to another person
+    /// @param ticketToTransfer ID of the ticket that will be resold/gifted
+    /// @param ticketSeller Address of the recipient
+    /// @param resellPrice Price at which the ticket will be sold at. (Resell price range is 0 to original buying price)
+    function transferTicket(uint ticketToTransfer, address payable ticketSeller, uint resellPrice) public payable {
+        require(ticketOwner[ticketToTransfer] == msg.sender, "Cannot transfer ticket to yourself.");
+        require(ticketSeller == msg.sender, "Cannot transfer ticket to yourself.");
+        require(resellPrice <= ticketPrice, "Resell price cannot exceed original ticket price."); // ADDED: Check if resell price is within range
+        require(ticketUsed[ticketToTransfer] == false, "Ticket has already been used!"); // ADDED: Check if ticket has already been used
+        
+        if (resellPrice > 0) {
+            // Transfer payment to the seller
+            require(msg.value == resellPrice, "Incorrect resell price.");
+            payable(msg.sender).transfer(msg.value);
+        }
+
+        //ADDED: Update ticket ownership
+        ticketOwner[ticketToTransfer] = msg.sender;
+    }
+
     /// @notice markTicket Allows the organizer to mark the buyer's ticket as used before entering the concert
     /// @param _ticketId Address of the ticket
     function markTicket(uint _ticketId) external isOrganizer {
