@@ -36,7 +36,7 @@ contract ConcertFactory {
     function getDeployedConcerts() public view returns (ConcertContract[] memory) {
         return deployedConcerts;
     }
- }
+}
 
 
 /// @notice This is the Child Contract of ConcertFactory
