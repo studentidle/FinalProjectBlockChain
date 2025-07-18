@@ -238,6 +238,21 @@ contract ConcertContract {
         concertCancelled = true;
     }
 
+    function refundTickets() external isOrganizer {
+        require(concertCancelled == true, "Concert is not cancelled.");
+
+        for (uint i = 1; i < ticketId; i++) {
+            address owner = ticketOwner[i];
+            
+            if (owner != address(0) && !ticketUsed[i]) {
+                SeatTier tier = ticketTier[i]; // stores the tier of the ticketId
+                uint refundPrice = ticketPrices[tier]; // stores the price of the seat tier
+                payable(owner).transfer(refundPrice);
+                ticketOwner[i] = address(0); // removes ownership of the ticketId
+            }
+        }
+    }
+
     function getMyTickets() public view returns (uint[] memory) {
         return buyers[msg.sender].ticketIds; // Return the list of ticket IDs owned by the buyer
     }
