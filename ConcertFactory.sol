@@ -80,6 +80,14 @@ contract ConcertContract {
         uint[] ticketIds;
     }
 
+    struct PendingTransfer {
+        address resellBuyer;
+        address seller;
+        uint sellingPrice;
+    }
+
+    mapping(uint => PendingTransfer) public pendingTransfers;
+
     mapping(address => Buyer) public buyers; // Buyer address → Buyer details
     mapping(uint => address) public ticketOwner; // Ticket ID → Owner
     mapping(uint => bool) public ticketUsed; // Ticket ID → Used status
@@ -101,6 +109,10 @@ contract ConcertContract {
     }
 
     event TicketUsed(address indexed buyer, uint indexed ticketId);
+
+    event TicketTransferred(address indexed reseller, address indexed buyer, uint indexed ticketId);
+    event TicketTransferDenied(address indexed reseller, address indexed buyer, uint indexed ticketId);
+    event TransferPending(address indexed reseller, address indexed buyer, uint indexed ticketId);
 
     constructor(
         string memory _name,
@@ -166,15 +178,46 @@ contract ConcertContract {
         require(ticketSeller != msg.sender, "Cannot transfer ticket to yourself.");
         require(resellPrice <= ticketPrices[ticketTier[ticketToTransfer]], "Resell price cannot exceed original ticket price."); // ADDED: Check if resell price is within range
         require(ticketUsed[ticketToTransfer] == false, "Ticket has already been used!"); // ADDED: Check if ticket has already been used
-        
-        if (resellPrice > 0) {
-            // Transfer payment to the seller
-            require(msg.value == resellPrice, "Incorrect resell price.");
-            payable(ticketSeller).transfer(msg.value);
+        require(msg.value == resellPrice, "Incorrect resell price.");
+
+        // ADDED: Update pending transfer details
+        PendingTransfer storage transfer = pendingTransfers[ticketToTransfer];
+        require(transfer.resellBuyer == address(0), "Ticket already has a pending transfer.");
+        transfer.resellBuyer = msg.sender;
+        transfer.sellingPrice = resellPrice;
+        transfer.seller = ticketSeller;
+
+        emit TransferPending(ticketSeller, msg.sender, ticketToTransfer);
+    }
+
+    /// @notice confirmTransfer Allows seller to confirm the transfer intiated by the buyer
+    /// @param ticketToTransfer ID of the ticket that will be transferred
+    function confirmTransfer(uint ticketToTransfer, bool confirm) public  {
+        PendingTransfer storage transfer = pendingTransfers[ticketToTransfer];
+        address ticketSeller = ticketOwner[ticketToTransfer];
+        address buyer = transfer.resellBuyer;
+        uint price = transfer.sellingPrice;
+        require(ticketSeller == msg.sender, "Only seller can confirm transfer.");
+        require(ticketUsed[ticketToTransfer] == false, "Ticket has already been used!"); // ADDED: Check if ticket has already been used
+        require(buyer != address(0), "No pending transfer.");
+
+        if (confirm) {
+            if (price > 0) {
+                // Transfer payment to the seller
+                payable(msg.sender).transfer(price);
+            }
+        //ADDED: Update ticket ownership
+        ticketOwner[ticketToTransfer] = buyer;
+        emit TicketTransferred(msg.sender, buyer, ticketToTransfer);
+        } 
+        else {
+            if (price > 0) {
+                payable(buyer).transfer(price);
+            }
+        emit TicketTransferDenied(msg.sender, buyer, ticketToTransfer);
         }
 
-        //ADDED: Update ticket ownership
-        ticketOwner[ticketToTransfer] = msg.sender;
+        delete pendingTransfers[ticketToTransfer];
     }
 
     /// @notice markTicket Allows the organizer to mark the buyer's ticket as used before entering the concert
