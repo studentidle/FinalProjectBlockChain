@@ -257,6 +257,16 @@ contract ConcertContract {
         }
     }
 
+    function addTicketCapacity(SeatTier _tier, uint _additionalCapacity) public isOrganizer {
+        require(_additionalCapacity > 0, "Additional capacity must be greater than zero.");
+        tierCapacity[_tier] += _additionalCapacity; // Increase the capacity for the specified tier
+    }
+
+    function modifyTicketPrice(SeatTier _tier, uint _newPrice) public isOrganizer {
+        require(_newPrice > 0, "New price must be greater than zero.");
+        ticketPrices[_tier] = _newPrice; // Update the price for the specified tier
+    }
+
     function getMyTickets() public view returns (uint[] memory) {
         return buyers[msg.sender].ticketIds; // Return the list of ticket IDs owned by the buyer
     }
