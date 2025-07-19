@@ -63,7 +63,7 @@ contract ConcertContract {
 
     string public concertName;
     uint public totalTixPerBuyer; // max number of ticket that can be bought
-    string public expirationDate;
+    uint public expirationDate;
 
     address internal organizer;
     uint private ticketId = 1;
@@ -85,10 +85,9 @@ contract ConcertContract {
     }
 
     mapping(uint => PendingTransfer) public pendingTransfers;
-
-    mapping(address => Buyer) public buyers; // Buyer address → Buyer details
+    mapping(address => Buyer) public buyers; // Buyer Dddress → Buyer Details
     mapping(uint => address) public ticketOwner; // Ticket ID → Owner
-    mapping(uint => bool) public ticketUsed; // Ticket ID → Used status
+    mapping(uint => bool) public ticketUsed; // Ticket ID → Used Status
     mapping(SeatTier => uint) public ticketPrices; // Ticket Tier → Ticket Price
     mapping(uint => SeatTier) public ticketTier; // Ticket ID → Seat Tier
     mapping(SeatTier => uint) public tierCapacity; // Seat Tier → Tier Capacity
@@ -106,16 +105,15 @@ contract ConcertContract {
         _;
     }
 
-    modifier isTicketExpired() {
-        require(block.timestamp < expirationTimestamp, "Ticket is expired.");
+    modifier hasTicketExpired() {
+        require(block.timestamp <= expirationDate, "Ticket has expired.");
         _;
     }
 
     event TicketUsed(address indexed buyer, uint indexed ticketId);
-
+    event TransferPending(address indexed reseller, address indexed buyer, uint indexed ticketId);
     event TicketTransferred(address indexed reseller, address indexed buyer, uint indexed ticketId);
     event TicketTransferDenied(address indexed reseller, address indexed buyer, uint indexed ticketId);
-    event TransferPending(address indexed reseller, address indexed buyer, uint indexed ticketId);
 
     constructor(
         string memory _name,
@@ -123,7 +121,7 @@ contract ConcertContract {
         uint[] memory _capacities,
         uint _maxTixPerBuyer,
         address _organizer,
-        string memory _date
+        uint _date
     ) {
         concertName = _name;
         totalTixPerBuyer = _maxTixPerBuyer;
@@ -140,7 +138,7 @@ contract ConcertContract {
     }
 
     /// @notice buyTicket allows customers to purchase tickets for the concert
-    function buyTicket(string memory _name, SeatTier _tier, uint _quantity) public payable isBuyer() {
+    function buyTicket(string memory _name, SeatTier _tier, uint _quantity) public payable isBuyer hasTicketExpired {
         require(_quantity > 0 && _quantity <= totalTixPerBuyer, "Invalid quantity.");
         require(buyers[msg.sender].ticketsPurchased + _quantity <= totalTixPerBuyer, "Exceeds ticket purchase limit.");
         require((seatingSold[_tier] + _quantity) <= tierCapacity[_tier], "There are no available seats!");
@@ -167,7 +165,7 @@ contract ConcertContract {
     /// @notice transferTicket Allows a ticket owner to gift or resell their ticket to another person
     /// @param ticketToTransfer ID of the ticket that will be resold/gifted
     /// @param resellPrice Price at which the ticket will be sold at. (Resell price range is 0 to original buying price)
-    function transferTicket(uint ticketToTransfer, uint resellPrice) public payable {
+    function transferTicket(uint ticketToTransfer, uint resellPrice) public payable hasTicketExpired {
         address ticketSeller = ticketOwner[ticketToTransfer];
         require(ticketSeller != msg.sender, "Cannot transfer ticket to yourself.");
 
@@ -188,7 +186,7 @@ contract ConcertContract {
 
     /// @notice confirmTransfer Allows seller to confirm the transfer intiated by the buyer
     /// @param ticketToTransfer ID of the ticket that will be transferred
-    function confirmTransfer(uint ticketToTransfer, bool confirm) public  {
+    function confirmTransfer(uint ticketToTransfer, bool confirm) public hasTicketExpired {
         PendingTransfer storage transfer = pendingTransfers[ticketToTransfer];
 
         address ticketSeller = ticketOwner[ticketToTransfer];
@@ -208,6 +206,15 @@ contract ConcertContract {
             //ADDED: Update ticket ownership
             ticketOwner[ticketToTransfer] = newBuyer;
 
+            uint[] storage sellerTickets = buyers[msg.sender].ticketIds;
+            for (uint i = 0; i < sellerTickets.length; i++) {
+                if (sellerTickets[i] == ticketToTransfer) {
+                    sellerTickets[i] = sellerTickets[sellerTickets.length - 1];
+                    sellerTickets.pop();
+                    break;
+                }
+            }
+
             // Checks if new buyer is receiving a ticket for the first time
             if (buyers[newBuyer].buyerAddress == address(0)) {
                 buyers[newBuyer].buyerAddress = newBuyer;
@@ -216,6 +223,7 @@ contract ConcertContract {
 
             buyers[newBuyer].ticketIds.push(ticketToTransfer);
             buyers[newBuyer].ticketsPurchased++;
+
             emit TicketTransferred(msg.sender, newBuyer, ticketToTransfer);
         } 
         else {
