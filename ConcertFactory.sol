@@ -17,7 +17,7 @@ contract ConcertFactory {
         uint[] _capacities,
         uint _maxTixPerBuyer,
         address _organizer,
-        string _date
+        uint _date
     );
 
     constructor() {
@@ -37,7 +37,7 @@ contract ConcertFactory {
         uint[] memory _capacities,
         uint _maxTixPerBuyer,
         address _organizer,
-        string memory _date
+        uint _date
     ) public {
         require(msg.sender == admin, "Only admin can create a concert.");
         require(_prices.length == _capacities.length, "Please provide complete pricing details.");
@@ -103,6 +103,11 @@ contract ConcertContract {
 
     modifier isBuyer() {
         require(msg.sender != organizer, "Organizer cannot perform this action.");
+        _;
+    }
+
+    modifier isTicketExpired() {
+        require(block.timestamp < expirationTimestamp, "Ticket is expired.");
         _;
     }
 
