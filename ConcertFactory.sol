@@ -90,9 +90,9 @@ contract ConcertContract {
     mapping(uint => address) public ticketOwner; // Ticket ID → Owner
     mapping(uint => bool) public ticketUsed; // Ticket ID → Used status
     mapping(SeatTier => uint) public ticketPrices; // Ticket Tier → Ticket Price
-    mapping(uint => SeatTier) public ticketTier;
-    mapping(SeatTier => uint) public tierCapacity; // Ticket Tier → Tier Capacity
-    mapping (SeatTier => uint) public seatingSold;
+    mapping(uint => SeatTier) public ticketTier; // Ticket ID → Seat Tier
+    mapping(SeatTier => uint) public tierCapacity; // Seat Tier → Tier Capacity
+    mapping (SeatTier => uint) public seatingSold; // Seat Tier → sets the number of tickets sold for each tier
     
 
     /// @notice Modifier that checks if the organizer called the function
