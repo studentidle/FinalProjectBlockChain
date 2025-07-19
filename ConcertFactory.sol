@@ -41,6 +41,7 @@ contract ConcertFactory {
     ) public {
         require(msg.sender == admin, "Only admin can create a concert.");
         require(_prices.length == _capacities.length, "Please provide complete pricing details.");
+        require(block.timestamp < _date, "Concert date must be in the future.");
 
         ConcertContract newConcert = new ConcertContract(_name, _prices, _capacities, _maxTixPerBuyer, _organizer, _date);
         deployedConcerts.push(newConcert);
