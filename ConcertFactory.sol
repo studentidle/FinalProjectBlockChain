@@ -62,7 +62,6 @@ contract ConcertFactory {
 contract ConcertContract {
     // This contract has functions to manage concert details, purchasing tickets, transfers, and cancellations.
 
-
     string public concertName; // Name of the concert
     uint public totalTixPerBuyer; // max number of ticket that can be bought of each buyer
     uint public expirationDate; // Date of the concert and expiration of the ticket
@@ -97,7 +96,6 @@ contract ConcertContract {
     mapping(uint => SeatTier) public ticketTier; // Ticket ID → Seat Tier
     mapping(SeatTier => uint) public tierCapacity; // Seat Tier → Tier Capacity
     mapping (SeatTier => uint) public seatingSold; // Seat Tier → sets the number of tickets sold for each tier
-    
 
     /// @notice Modifier that checks if the organizer called the function
     modifier isOrganizer() {
@@ -122,7 +120,7 @@ contract ConcertContract {
         require(concertCancelled == false, "Concert has already been cancelled");
         _;
     }
-    
+
     event TicketUsed(address indexed buyer, uint indexed ticketId); // Event emitted when a ticket is marked as used
     event TransferPending(address indexed reseller, address indexed buyer, uint indexed ticketId); // Event emitted when a ticket transfer is pending
     event TicketTransferred(address indexed reseller, address indexed buyer, uint indexed ticketId); // Event emitted when a ticket is successfully transferred
@@ -169,7 +167,7 @@ contract ConcertContract {
         require(msg.value == (ticketPrices[_tier] * _quantity), "Incorrect ticket price.");
         require(ticketOwner[ticketId] == address(0), "Ticket already owned.");
 
-        // ADDED: Create a new buyer if they don't exist
+        // Creates a new buyer if they don't exist
         Buyer storage buyer = buyers[msg.sender];
 
         if (buyer.buyerAddress == address(0)) {
@@ -177,7 +175,7 @@ contract ConcertContract {
             buyer.name = _name;
         }
         
-        // ADDED: Update buyer's ticket details
+        // Updates buyer's ticket details
         for (uint i = 0; i < _quantity; i++) {
             buyer.ticketsPurchased++;
             buyer.ticketIds.push(ticketId);
@@ -193,15 +191,19 @@ contract ConcertContract {
     /// @param resellPrice Price at which the ticket will be sold at. (Resell price range is 0 to original buying price)
     function transferTicket(uint ticketToTransfer, uint resellPrice) public payable hasTicketExpired concertNotCancelled {
         address ticketSeller = ticketOwner[ticketToTransfer];
+
         require(ticketSeller != msg.sender, "Cannot transfer ticket to yourself.");
 
-        // ADDED: Check if resell price is within range
+        // Checks if resell price is within range
         require(resellPrice <= ticketPrices[ticketTier[ticketToTransfer]], "Resell price cannot exceed original ticket price.");
-        require(ticketUsed[ticketToTransfer] == false, "Ticket has already been used!"); // ADDED: Check if ticket has already been used
+
+        // Checks if ticket has already been used
+        require(ticketUsed[ticketToTransfer] == false, "Ticket has already been used!");
         require(msg.value == resellPrice, "Incorrect resell price.");
 
-        // ADDED: Update pending transfer details
+        // Updates pending transfer details
         PendingTransfer storage transfer = pendingTransfers[ticketToTransfer];
+
         require(transfer.resellBuyer == address(0), "Ticket already has a pending transfer.");
         transfer.resellBuyer = msg.sender;
         transfer.sellingPrice = resellPrice;
@@ -221,16 +223,18 @@ contract ConcertContract {
         uint price = transfer.sellingPrice;
 
         require(ticketSeller == msg.sender, "Only seller can confirm transfer.");
-        require(ticketUsed[ticketToTransfer] == false, "Ticket has already been used!"); // ADDED: Check if ticket has already been used
+
+        // Checks if ticket has already been used
+        require(ticketUsed[ticketToTransfer] == false, "Ticket has already been used!");
         require(newBuyer != address(0), "No pending transfer.");
 
         if (confirm) {
             if (price > 0) {
-                // Transfer payment to the seller
+                // Transfers payment to the seller
                 payable(msg.sender).transfer(price);
             }
 
-            //ADDED: Update ticket ownership
+            // Updates ticket ownership
             ticketOwner[ticketToTransfer] = newBuyer;
 
             uint[] storage sellerTickets = buyers[msg.sender].ticketIds;
@@ -267,13 +271,16 @@ contract ConcertContract {
     /// @notice markTicket Allows the organizer to mark the buyer's ticket as used before entering the concert
     /// @param _ticketId Address of the ticket
     function markTicket(uint _ticketId) external isOrganizer concertNotCancelled {
-        require(ticketOwner[_ticketId] != address(0), "Invalid ticket ID!"); // ADDED: Check if ticket ID is valid
-        require(ticketUsed[_ticketId] == false, "Ticket has already been used!"); // ADDED: Check if ticket has already been used
+        // Checks if ticket ID is valid
+        require(ticketOwner[_ticketId] != address(0), "Invalid ticket ID!");
+
+        // Checks if ticket has already been used
+        require(ticketUsed[_ticketId] == false, "Ticket has already been used!");
         
-        // ADDED: Update ticket status
+        // Updates ticket status
         ticketUsed[_ticketId] = true;
 
-        // ADDED: Record in the transaction logs
+        // Records in the transaction logs
         emit TicketUsed(ticketOwner[_ticketId], _ticketId);
     }
 
@@ -290,10 +297,10 @@ contract ConcertContract {
             address owner = ticketOwner[i];
             
             if (owner != address(0) && !ticketUsed[i]) {
-                SeatTier tier = ticketTier[i]; // stores the tier of the ticketId
-                uint refundPrice = ticketPrices[tier]; // stores the price of the seat tier
+                SeatTier tier = ticketTier[i]; // Stores the tier of the ticketId
+                uint refundPrice = ticketPrices[tier]; // Stores the price of the seat tier
                 payable(owner).transfer(refundPrice);
-                ticketOwner[i] = address(0); // removes ownership of the ticketId
+                ticketOwner[i] = address(0); // Removes ownership of the ticketId
             }
         }
     }
@@ -301,17 +308,17 @@ contract ConcertContract {
     /// @notice addTicketCapacity allows the organizer to increase the capacity of a specific seat tier
     function addTicketCapacity(SeatTier _tier, uint _additionalCapacity) public isOrganizer concertNotCancelled {
         require(_additionalCapacity > 0, "Additional capacity must be greater than zero.");
-        tierCapacity[_tier] += _additionalCapacity; // Increase the capacity for the specified tier
+        tierCapacity[_tier] += _additionalCapacity; // Increases the capacity for the specified tier
     }
 
     /// @notice modifyTicketPrice allows the organizer to change the price of a specific seat tier
     function modifyTicketPrice(SeatTier _tier, uint _newPrice) public isOrganizer concertNotCancelled {
         require(_newPrice > 0, "New price must be greater than zero.");
-        ticketPrices[_tier] = _newPrice; // Update the price for the specified tier
+        ticketPrices[_tier] = _newPrice; // Updates the price for the specified tier
     }
 
     /// @notice getConcertDetails returns the details of the concert
     function getMyTickets() public view returns (uint[] memory) {
-        return buyers[msg.sender].ticketIds; // Return the list of ticket IDs owned by the buyer
+        return buyers[msg.sender].ticketIds; // Returns the list of ticket IDs owned by the buyer
     }
 }
