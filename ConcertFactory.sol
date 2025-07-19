@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity >=0.8.2 <0.9.0;
 
-// REMINDER: Make sure to add documention thingy
 /// @notice This is the Parent Contract
 contract ConcertFactory {
     // This contract is a placeholder for the ConcertFactory
@@ -63,7 +62,6 @@ contract ConcertContract {
     // For now, it serves as a base for future development
 
     string public concertName;
-    // uint public ticketPrice; NOTE: We don't need this anymore because we have dynamic pricing already.
     uint public totalTixPerBuyer; // max number of ticket that can be bought
     string public expirationDate;
 
@@ -79,6 +77,14 @@ contract ConcertContract {
         uint ticketsPurchased;
         uint[] ticketIds;
     }
+
+    struct PendingTransfer {
+        address resellBuyer;
+        address seller;
+        uint sellingPrice;
+    }
+
+    mapping(uint => PendingTransfer) public pendingTransfers;
 
     mapping(address => Buyer) public buyers; // Buyer address → Buyer details
     mapping(uint => address) public ticketOwner; // Ticket ID → Owner
@@ -101,6 +107,10 @@ contract ConcertContract {
     }
 
     event TicketUsed(address indexed buyer, uint indexed ticketId);
+
+    event TicketTransferred(address indexed reseller, address indexed buyer, uint indexed ticketId);
+    event TicketTransferDenied(address indexed reseller, address indexed buyer, uint indexed ticketId);
+    event TransferPending(address indexed reseller, address indexed buyer, uint indexed ticketId);
 
     constructor(
         string memory _name,
@@ -125,57 +135,93 @@ contract ConcertContract {
     }
 
     /// @notice buyTicket allows customers to purchase tickets for the concert
-    // They can only buy tickets one at a time. Idk if ilan pwede mahoard na tix ng isang buyer 
     function buyTicket(string memory _name, SeatTier _tier, uint _quantity) public payable isBuyer() {
-        // Checks if the amount of tickets to be purchased is still
-        // within the range of allowable ticket purchases.
         require(_quantity > 0 && _quantity <= totalTixPerBuyer, "Invalid quantity.");
-
-        // Checks if there are available seats left
+        require(buyers[msg.sender].ticketsPurchased + _quantity <= totalTixPerBuyer, "Exceeds ticket purchase limit.");
         require((seatingSold[_tier] + _quantity) <= tierCapacity[_tier], "There are no available seats!");
-
-        // Checks if payment is correct (NOTE: total = ticket price * # of tickets)
         require(msg.value == (ticketPrices[_tier] * _quantity), "Incorrect ticket price.");
         require(ticketOwner[ticketId] == address(0), "Ticket already owned.");
 
-        // Creates customer record
         Buyer storage buyer = buyers[msg.sender];
 
         if (buyer.buyerAddress == address(0)) {
-            // If first time buyer, set info
             buyer.buyerAddress = msg.sender;
             buyer.name = _name;
         }
 
         for (uint i = 0; i < _quantity; i++) {
-            // Updates buyer's ticket purchase details
             buyer.ticketsPurchased++;
             buyer.ticketIds.push(ticketId);
             ticketOwner[ticketId] = msg.sender;
             ticketTier[ticketId] = _tier;
             seatingSold[_tier]++;
-            ticketId++; // Increments ticketId
+            ticketId++;
         }
     }
 
     /// @notice transferTicket Allows a ticket owner to gift or resell their ticket to another person
     /// @param ticketToTransfer ID of the ticket that will be resold/gifted
-    /// @param ticketSeller Address of the recipient
     /// @param resellPrice Price at which the ticket will be sold at. (Resell price range is 0 to original buying price)
-    function transferTicket(uint ticketToTransfer, address payable ticketSeller, uint resellPrice) public payable {
-        require(ticketOwner[ticketToTransfer] == msg.sender, "Cannot transfer ticket to yourself.");
-        require(ticketSeller == msg.sender, "Cannot transfer ticket to yourself.");
-        require(resellPrice <= ticketPrice, "Resell price cannot exceed original ticket price."); // ADDED: Check if resell price is within range
+    function transferTicket(uint ticketToTransfer, uint resellPrice) public payable {
+        address ticketSeller = ticketOwner[ticketToTransfer];
+        require(ticketSeller != msg.sender, "Cannot transfer ticket to yourself.");
+
+        // ADDED: Check if resell price is within range
+        require(resellPrice <= ticketPrices[ticketTier[ticketToTransfer]], "Resell price cannot exceed original ticket price.");
         require(ticketUsed[ticketToTransfer] == false, "Ticket has already been used!"); // ADDED: Check if ticket has already been used
-        
-        if (resellPrice > 0) {
-            // Transfer payment to the seller
-            require(msg.value == resellPrice, "Incorrect resell price.");
-            payable(msg.sender).transfer(msg.value);
+        require(msg.value == resellPrice, "Incorrect resell price.");
+
+        // ADDED: Update pending transfer details
+        PendingTransfer storage transfer = pendingTransfers[ticketToTransfer];
+        require(transfer.resellBuyer == address(0), "Ticket already has a pending transfer.");
+        transfer.resellBuyer = msg.sender;
+        transfer.sellingPrice = resellPrice;
+        transfer.seller = ticketSeller;
+
+        emit TransferPending(ticketSeller, msg.sender, ticketToTransfer);
+    }
+
+    /// @notice confirmTransfer Allows seller to confirm the transfer intiated by the buyer
+    /// @param ticketToTransfer ID of the ticket that will be transferred
+    function confirmTransfer(uint ticketToTransfer, bool confirm) public  {
+        PendingTransfer storage transfer = pendingTransfers[ticketToTransfer];
+
+        address ticketSeller = ticketOwner[ticketToTransfer];
+        address newBuyer = transfer.resellBuyer;
+        uint price = transfer.sellingPrice;
+
+        require(ticketSeller == msg.sender, "Only seller can confirm transfer.");
+        require(ticketUsed[ticketToTransfer] == false, "Ticket has already been used!"); // ADDED: Check if ticket has already been used
+        require(newBuyer != address(0), "No pending transfer.");
+
+        if (confirm) {
+            if (price > 0) {
+                // Transfer payment to the seller
+                payable(msg.sender).transfer(price);
+            }
+
+            //ADDED: Update ticket ownership
+            ticketOwner[ticketToTransfer] = newBuyer;
+
+            // Checks if new buyer is receiving a ticket for the first time
+            if (buyers[newBuyer].buyerAddress == address(0)) {
+                buyers[newBuyer].buyerAddress = newBuyer;
+                buyers[newBuyer].name = "Secondary Buyer";
+            }
+
+            buyers[newBuyer].ticketIds.push(ticketToTransfer);
+            buyers[newBuyer].ticketsPurchased++;
+            emit TicketTransferred(msg.sender, newBuyer, ticketToTransfer);
+        } 
+        else {
+            if (price > 0) {
+                payable(newBuyer).transfer(price);
+            }
+
+            emit TicketTransferDenied(msg.sender, newBuyer, ticketToTransfer);
         }
 
-        //ADDED: Update ticket ownership
-        ticketOwner[ticketToTransfer] = msg.sender;
+        delete pendingTransfers[ticketToTransfer];
     }
 
     /// @notice markTicket Allows the organizer to mark the buyer's ticket as used before entering the concert
@@ -194,6 +240,21 @@ contract ConcertContract {
     function cancelConcert() external isOrganizer {
         require(concertCancelled == false, "Concert has already been cancelled");
         concertCancelled = true;
+    }
+
+    function refundTickets() external isOrganizer {
+        require(concertCancelled == true, "Concert is not cancelled.");
+
+        for (uint i = 1; i < ticketId; i++) {
+            address owner = ticketOwner[i];
+            
+            if (owner != address(0) && !ticketUsed[i]) {
+                SeatTier tier = ticketTier[i]; // stores the tier of the ticketId
+                uint refundPrice = ticketPrices[tier]; // stores the price of the seat tier
+                payable(owner).transfer(refundPrice);
+                ticketOwner[i] = address(0); // removes ownership of the ticketId
+            }
+        }
     }
 
     function getMyTickets() public view returns (uint[] memory) {
