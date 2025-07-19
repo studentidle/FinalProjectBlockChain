@@ -110,6 +110,11 @@ contract ConcertContract {
         _;
     }
 
+    modifier concertNotCancelled() {
+        require(concertCancelled == false, "Concert has already been cancelled");
+        _;
+    }
+
     event TicketUsed(address indexed buyer, uint indexed ticketId);
     event TransferPending(address indexed reseller, address indexed buyer, uint indexed ticketId);
     event TicketTransferred(address indexed reseller, address indexed buyer, uint indexed ticketId);
@@ -138,7 +143,7 @@ contract ConcertContract {
     }
 
     /// @notice buyTicket allows customers to purchase tickets for the concert
-    function buyTicket(string memory _name, SeatTier _tier, uint _quantity) public payable isBuyer hasTicketExpired {
+    function buyTicket(string memory _name, SeatTier _tier, uint _quantity) public payable isBuyer hasTicketExpired concertNotCancelled {
         require(_quantity > 0 && _quantity <= totalTixPerBuyer, "Invalid quantity.");
         require(buyers[msg.sender].ticketsPurchased + _quantity <= totalTixPerBuyer, "Exceeds ticket purchase limit.");
         require((seatingSold[_tier] + _quantity) <= tierCapacity[_tier], "There are no available seats!");
@@ -165,7 +170,7 @@ contract ConcertContract {
     /// @notice transferTicket Allows a ticket owner to gift or resell their ticket to another person
     /// @param ticketToTransfer ID of the ticket that will be resold/gifted
     /// @param resellPrice Price at which the ticket will be sold at. (Resell price range is 0 to original buying price)
-    function transferTicket(uint ticketToTransfer, uint resellPrice) public payable hasTicketExpired {
+    function transferTicket(uint ticketToTransfer, uint resellPrice) public payable hasTicketExpired concertNotCancelled {
         address ticketSeller = ticketOwner[ticketToTransfer];
         require(ticketSeller != msg.sender, "Cannot transfer ticket to yourself.");
 
@@ -186,7 +191,7 @@ contract ConcertContract {
 
     /// @notice confirmTransfer Allows seller to confirm the transfer intiated by the buyer
     /// @param ticketToTransfer ID of the ticket that will be transferred
-    function confirmTransfer(uint ticketToTransfer, bool confirm) public hasTicketExpired {
+    function confirmTransfer(uint ticketToTransfer, bool confirm) public hasTicketExpired concertNotCancelled {
         PendingTransfer storage transfer = pendingTransfers[ticketToTransfer];
 
         address ticketSeller = ticketOwner[ticketToTransfer];
@@ -239,7 +244,7 @@ contract ConcertContract {
 
     /// @notice markTicket Allows the organizer to mark the buyer's ticket as used before entering the concert
     /// @param _ticketId Address of the ticket
-    function markTicket(uint _ticketId) external isOrganizer {
+    function markTicket(uint _ticketId) external isOrganizer concertNotCancelled {
         require(ticketOwner[_ticketId] != address(0), "Invalid ticket ID!"); // ADDED: Check if ticket ID is valid
         require(ticketUsed[_ticketId] == false, "Ticket has already been used!"); // ADDED: Check if ticket has already been used
         
@@ -250,8 +255,7 @@ contract ConcertContract {
         emit TicketUsed(ticketOwner[_ticketId], _ticketId);
     }
 
-    function cancelConcert() external isOrganizer {
-        require(concertCancelled == false, "Concert has already been cancelled");
+    function cancelConcert() external isOrganizer concertNotCancelled {
         concertCancelled = true;
     }
 
@@ -270,12 +274,12 @@ contract ConcertContract {
         }
     }
 
-    function addTicketCapacity(SeatTier _tier, uint _additionalCapacity) public isOrganizer {
+    function addTicketCapacity(SeatTier _tier, uint _additionalCapacity) public isOrganizer concertNotCancelled {
         require(_additionalCapacity > 0, "Additional capacity must be greater than zero.");
         tierCapacity[_tier] += _additionalCapacity; // Increase the capacity for the specified tier
     }
 
-    function modifyTicketPrice(SeatTier _tier, uint _newPrice) public isOrganizer {
+    function modifyTicketPrice(SeatTier _tier, uint _newPrice) public isOrganizer concertNotCancelled {
         require(_newPrice > 0, "New price must be greater than zero.");
         ticketPrices[_tier] = _newPrice; // Update the price for the specified tier
     }
